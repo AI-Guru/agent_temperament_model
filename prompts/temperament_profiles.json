@@ -1,0 +1,112 @@
+{
+  "extraverted_agreeable": {
+    "extraversion": {
+      "spectrum": "extraversion",
+      "intensity": 0.6
+    },
+    "agreeableness": {
+      "spectrum": "agreeableness",
+      "intensity": 0.6
+    },
+    "conscientiousness": {
+      "spectrum": "conscientiousness",
+      "intensity": 0.0
+    },
+    "emotional_stability": {
+      "spectrum": "emotional_stability",
+      "intensity": 0.0
+    },
+    "openness": {
+      "spectrum": "openness",
+      "intensity": 0.0
+    }
+  },
+  "analytical_stable": {
+    "extraversion": {
+      "spectrum": "extraversion",
+      "intensity": 0.0
+    },
+    "agreeableness": {
+      "spectrum": "agreeableness",
+      "intensity": 0.0
+    },
+    "conscientiousness": {
+      "spectrum": "conscientiousness",
+      "intensity": 0.6
+    },
+    "emotional_stability": {
+      "spectrum": "emotional_stability",
+      "intensity": 0.6
+    },
+    "openness": {
+      "spectrum": "openness",
+      "intensity": 0.3
+    }
+  },
+  "balanced_communicator": {
+    "extraversion": {
+      "spectrum": "extraversion",
+      "intensity": 0.0
+    },
+    "agreeableness": {
+      "spectrum": "agreeableness",
+      "intensity": 0.3
+    },
+    "conscientiousness": {
+      "spectrum": "conscientiousness",
+      "intensity": 0.0
+    },
+    "emotional_stability": {
+      "spectrum": "emotional_stability",
+      "intensity": 0.3
+    },
+    "openness": {
+      "spectrum": "openness",
+      "intensity": 0.0
+    }
+  },
+  "creative_innovator": {
+    "extraversion": {
+      "spectrum": "extraversion",
+      "intensity": 0.3
+    },
+    "agreeableness": {
+      "spectrum": "agreeableness",
+      "intensity": 0.0
+    },
+    "conscientiousness": {
+      "spectrum": "conscientiousness",
+      "intensity": -0.3
+    },
+    "emotional_stability": {
+      "spectrum": "emotional_stability",
+      "intensity": 0.0
+    },
+    "openness": {
+      "spectrum": "openness",
+      "intensity": 1.0
+    }
+  },
+  "reserved_specialist": {
+    "extraversion": {
+      "spectrum": "extraversion",
+      "intensity": -0.3
+    },
+    "agreeableness": {
+      "spectrum": "agreeableness",
+      "intensity": 0.0
+    },
+    "conscientiousness": {
+      "spectrum": "conscientiousness",
+      "intensity": 0.6
+    },
+    "emotional_stability": {
+      "spectrum": "emotional_stability",
+      "intensity": 0.0
+    },
+    "openness": {
+      "spectrum": "openness",
+      "intensity": -0.3
+    }
+  }
+}

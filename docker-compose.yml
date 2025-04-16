@@ -1,0 +1,21 @@
+# Docker Compose file for Emotional Agent
+
+services:
+  emotional-chatbot:
+    build: .
+    ports:
+      - "7860:7860"
+    volumes:
+      - ./.env:/app/.env
+    restart: unless-stopped
+    environment:
+      - PYTHONUNBUFFERED=1
+    # The ENTRYPOINT in Dockerfile handles running the script,
+    # so we just need to provide the arguments
+    command: ["--server-name", "0.0.0.0"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7860"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
