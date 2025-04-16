@@ -26,13 +26,11 @@ def test_agent_initialization():
     )
     custom_agent = TemperamentAgent(
         initial_profile=initial_profile,
-        trait_adaptation_rate=0.3,
         base_system_prompt="Custom prompt."
     )
     
     assert custom_agent.profile.extraversion.intensity == 0.6
     assert custom_agent.profile.agreeableness.intensity == 0.3
-    assert custom_agent.trait_adaptation_rate == 0.3
     assert custom_agent.base_system_prompt == "Custom prompt."
 
 
@@ -97,12 +95,12 @@ def test_trait_analyzer_integration():
             
         return traits
     
-    # Update personality state based on user message
+    # Analyze user message manually and update traits
     user_message = "I'm a very social person, but I can be quite critical of new ideas."
-    agent.update_temperament(
-        user_message=user_message,
-        trait_analyzer=simple_trait_analyzer
-    )
+    traits = simple_trait_analyzer(user_message)
+    
+    # Update temperament with the analyzed traits
+    agent.update_temperament(trait_adjustments=traits)
     
     # Check that traits were updated
     assert agent.profile.extraversion.intensity > 0  # Moved toward high extraversion
@@ -139,7 +137,6 @@ def test_save_and_load_state(tmp_path):
     )
     agent = TemperamentAgent(
         initial_profile=initial_profile,
-        trait_adaptation_rate=0.3,
         base_system_prompt="Custom prompt."
     )
     
@@ -156,5 +153,4 @@ def test_save_and_load_state(tmp_path):
     # Verify loaded state matches original
     assert loaded_agent.profile.extraversion.intensity == agent.profile.extraversion.intensity
     assert loaded_agent.profile.agreeableness.intensity == agent.profile.agreeableness.intensity
-    assert loaded_agent.trait_adaptation_rate == agent.trait_adaptation_rate
     assert loaded_agent.base_system_prompt == agent.base_system_prompt

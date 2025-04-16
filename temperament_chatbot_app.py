@@ -38,16 +38,14 @@ logger = logging.getLogger(__name__)
 
 
 class TemperamentChatBot:
-    """A chatbot that uses TemperamentAgent to manage its personality with weighted history."""
+    """A chatbot that uses TemperamentAgent to manage its personality with user-adjustable traits."""
     
     def __init__(
         self,
         initial_profile: TemperamentProfile = None,
         model_name: str = "gpt-4.1-mini-2025-04-14",
         temperature: float = 0.7,
-        max_tokens: int = 500,
-        trait_decay_factor: float = 0.8,  # How much to weight older traits (0-1)
-        max_trait_history: int = 5        # Maximum number of previous traits to consider
+        max_tokens: int = 500
     ):
         """
         Initialize the TemperamentChatBot.
@@ -57,8 +55,6 @@ class TemperamentChatBot:
             model_name: OpenAI model to use (e.g., "gpt-4", "gpt-3.5-turbo")
             temperature: Temperature parameter for generation
             max_tokens: Maximum tokens in responses
-            trait_decay_factor: How much to weight older traits (0-1)
-            max_trait_history: Maximum number of previous traits to consider
         """
         # Initialize OpenAI client
         api_key = os.getenv("OPENAI_API_KEY")
@@ -70,18 +66,12 @@ class TemperamentChatBot:
         self.temperature = temperature
         self.max_tokens = max_tokens
         
-        # Temperament memory parameters
-        self.trait_decay_factor = max(0.0, min(1.0, trait_decay_factor))
-        self.max_trait_history = max(1, max_trait_history)
-        self.trait_history = []  # List of (timestamp, trait_dict) tuples
-        
         # Create the temperament agent with a random or specified personality
         if initial_profile is None:
             initial_profile = self.generate_random_temperament()
         
         self.agent = TemperamentAgent(
             initial_profile=initial_profile,
-            trait_adaptation_rate=0.2,
             base_system_prompt=(
                 "You are a helpful AI assistant with a unique personality. "
                 "Your goal is to provide accurate and useful information while connecting with the user."
@@ -108,128 +98,7 @@ class TemperamentChatBot:
         logger.info(f"Generated random temperament profile")
         return profile
     
-    def analyze_traits(self, text: str) -> Dict[str, float]:
-        """
-        Analyze traits in text using the OpenAI API.
-        
-        Args:
-            text: Text to analyze
-            
-        Returns:
-            Dictionary mapping Big Five trait names to intensity values
-        """
-        try:
-            # Build a prompt for trait analysis
-            analysis_prompt = [
-                {
-                    "role": "system",
-                    "content": (
-                        "You are a personality analysis assistant. Analyze the text for personality traits "
-                        "and provide a JSON object with trait intensities on the Big Five spectra:\n"
-                        "- extraversion: -1.0 (extremely introverted) to 1.0 (extremely extraverted)\n"
-                        "- agreeableness: -1.0 (highly disagreeable) to 1.0 (highly agreeable)\n"
-                        "- conscientiousness: -1.0 (spontaneous/disorganized) to 1.0 (meticulous/organized)\n"
-                        "- emotional_stability: -1.0 (anxious/volatile) to 1.0 (calm/stable)\n"
-                        "- openness: -1.0 (conventional/practical) to 1.0 (creative/open to new ideas)\n"
-                        "Return ONLY a valid JSON object with these fields and numerical values between -1.0 and 1.0."
-                    )
-                },
-                {
-                    "role": "user",
-                    "content": text
-                }
-            ]
-            
-            # Get trait analysis from the model
-            response = self.client.chat.completions.create(
-                model=self.model_name,
-                messages=analysis_prompt,
-                temperature=0.2,  # Lower temperature for more consistent analysis
-                max_tokens=150
-            )
-            
-            # Extract the JSON response
-            analysis_text = response.choices[0].message.content.strip()
-            
-            # Find JSON object in the response
-            start_idx = analysis_text.find('{')
-            end_idx = analysis_text.rfind('}') + 1
-            
-            if start_idx != -1 and end_idx != -1:
-                json_str = analysis_text[start_idx:end_idx]
-                traits = json.loads(json_str)
-            else:
-                logger.warning(f"Couldn't extract JSON from analysis: {analysis_text}")
-                traits = {}
-            
-            # Ensure values are in the correct range
-            for key, value in traits.items():
-                traits[key] = max(-1.0, min(1.0, float(value)))
-            
-            # Add to trait history with current timestamp
-            self.add_to_trait_history(traits)
-            
-            logger.info(f"Trait analysis: {traits}")
-            return traits
-            
-        except Exception as e:
-            logger.error(f"Error analyzing traits: {e}")
-            return {}
-    
-    def add_to_trait_history(self, traits: Dict[str, float]) -> None:
-        """
-        Add traits to the history with current timestamp.
-        
-        Args:
-            traits: Dictionary of trait intensities
-        """
-        # Add current traits to history with timestamp
-        current_time = time.time()
-        self.trait_history.append((current_time, traits))
-        
-        # Limit the history size
-        if len(self.trait_history) > self.max_trait_history:
-            self.trait_history = self.trait_history[-self.max_trait_history:]
-    
-    def calculate_weighted_traits(self) -> Dict[str, float]:
-        """
-        Calculate weighted traits based on history with decay.
-        
-        Returns:
-            Dictionary of weighted trait intensities
-        """
-        if not self.trait_history:
-            return {}
-        
-        # Initialize result with zeros
-        all_trait_keys = set()
-        for _, traits in self.trait_history:
-            all_trait_keys.update(traits.keys())
-        
-        result = {key: 0.0 for key in all_trait_keys}
-        
-        # Calculate weights for each history entry
-        total_weight = 0.0
-        current_weight = 1.0  # Most recent has weight 1.0
-        
-        # Process from most recent to oldest
-        for _, traits in reversed(self.trait_history):
-            # Apply weights to each trait
-            for key, value in traits.items():
-                result[key] += value * current_weight
-            
-            # Track total weight applied
-            total_weight += current_weight
-            
-            # Decay weight for older entries
-            current_weight *= self.trait_decay_factor
-        
-        # Normalize by total weight
-        if total_weight > 0:
-            for key in result:
-                result[key] /= total_weight
-        
-        return result
+    # No longer need trait analysis functionality since we're using sliders
     
     def respond(self, user_message: str, chat_history: List = None) -> Tuple[str, Dict[str, Any]]:
         """
@@ -240,22 +109,9 @@ class TemperamentChatBot:
             chat_history: Optional chat history from the UI
             
         Returns:
-            Tuple of (assistant's response, trait state info)
+            Tuple of (assistant's response, empty dict for backward compatibility)
         """
         try:
-            # Analyze traits in the user message
-            user_traits = self.analyze_traits(user_message)
-            
-            # Calculate weighted traits from history
-            weighted_traits = self.calculate_weighted_traits()
-            
-            # Log the weighted traits
-            logger.info(f"Weighted traits across conversation: {weighted_traits}")
-            
-            # Update agent's trait state with weighted traits
-            # This gives a more stable response that considers conversation history
-            self.agent.update_temperament(trait_adjustments=weighted_traits)
-            
             # Get the current system prompt
             system_prompt = self.agent.get_system_prompt()
             
@@ -272,6 +128,10 @@ class TemperamentChatBot:
             # Add the current user message
             api_messages.append({"role": "user", "content": user_message})
             
+            for api_message in api_messages:
+                # Log the message for debugging
+                print(f"{api_message['role'].capitalize()}: {api_message['content']}")
+
             # Update our internal history
             self.messages = api_messages.copy()
             
@@ -289,51 +149,19 @@ class TemperamentChatBot:
             # Add assistant message to our internal history
             self.messages.append({"role": "assistant", "content": assistant_message})
             
-            # Get trait state information for display
-            trait_info = self._get_trait_display_info()
-            
             # Record the interaction
             self.agent.record_interaction(
                 user_message=user_message,
-                agent_response=assistant_message,
-                detected_user_traits=weighted_traits  # Use weighted traits
+                agent_response=assistant_message
             )
             
-            return assistant_message, trait_info
+            return assistant_message, {}
             
         except Exception as e:
             logger.error(f"Error generating response: {e}")
             return "I apologize, but I encountered an issue while processing your message. Could you try again?", {}
     
-    def _get_trait_display_info(self) -> Dict[str, Any]:
-        """
-        Get formatted trait information for display.
-        
-        Returns:
-            Dictionary with trait information
-        """
-        # Get dominant traits
-        dominant_traits = self.agent.profile.get_dominant_traits(n=3)
-        
-        # Get all trait values as a dictionary
-        trait_values = {
-            "extraversion": self.agent.profile.extraversion.intensity,
-            "agreeableness": self.agent.profile.agreeableness.intensity,
-            "conscientiousness": self.agent.profile.conscientiousness.intensity,
-            "emotional_stability": self.agent.profile.emotional_stability.intensity,
-            "openness": self.agent.profile.openness.intensity
-        }
-        
-        # Format the dominant traits for display
-        dominant_formatted = []
-        for trait in dominant_traits:
-            formatted = f"{trait['trait']} ({trait['spectrum']}: {trait['intensity']:.2f})"
-            dominant_formatted.append(formatted)
-        
-        return {
-            "dominant_traits": dominant_formatted,
-            "trait_values": trait_values
-        }
+    # No longer need the trait display info method since we're using sliders
     
     def reset_conversation(self) -> None:
         """Reset the conversation history while maintaining personality state."""
@@ -348,147 +176,7 @@ def format_message_for_display(message):
     return message
 
 
-def create_trait_chart(trait_values):
-    """Create a Big Five trait chart using Plotly."""
-    import plotly.graph_objects as go
-    from source.bigfivemodel import TRAIT_MAPPINGS, TraitSpectrum
-    
-    if not trait_values:
-        # Return empty chart if no values
-        fig = go.Figure()
-        fig.add_annotation(
-            text="No personality trait data available",
-            showarrow=False,
-            font=dict(size=14)
-        )
-        fig.update_layout(title="Big Five Personality Profile")
-        return fig
-    
-    # Define the intensity values
-    intensities = [-1.0, -0.6, -0.3, 0.0, 0.3, 0.6, 1.0]
-    intensity_labels = [str(i) for i in intensities]
-    
-    # Define Big Five spectrum colors
-    spectrum_colors = {
-        "extraversion": "rgba(255, 100, 100, 0.8)",     # Red
-        "agreeableness": "rgba(100, 200, 100, 0.8)",    # Green
-        "conscientiousness": "rgba(100, 100, 255, 0.8)", # Blue
-        "emotional_stability": "rgba(255, 200, 100, 0.8)", # Orange
-        "openness": "rgba(200, 100, 200, 0.8)"          # Purple
-    }
-    
-    # Create a figure
-    fig = go.Figure()
-    
-    # Define the order of spectra
-    spectra_order = [
-        "extraversion", 
-        "agreeableness", 
-        "conscientiousness", 
-        "emotional_stability", 
-        "openness"
-    ]
-    
-    # Add horizontal bars for each spectrum with markers at current value
-    y_positions = []
-    current_y = 5
-    
-    for spectrum_name in spectra_order:
-        current_y -= 1
-        y_positions.append(current_y)
-        
-        # Get the current value for this spectrum
-        current_value = trait_values.get(spectrum_name, 0)
-        
-        # Add a line representing the spectrum
-        fig.add_trace(go.Scatter(
-            x=intensities,
-            y=[current_y] * len(intensities),
-            mode='lines',
-            line=dict(color=spectrum_colors[spectrum_name], width=12),
-            name=spectrum_name.replace('_', ' ').title(),
-            showlegend=False
-        ))
-        
-        # Add marker for current value
-        fig.add_trace(go.Scatter(
-            x=[current_value],
-            y=[current_y],
-            mode='markers',
-            marker=dict(color='black', size=14, line=dict(color='white', width=2)),
-            name=f"Current: {spectrum_name.replace('_', ' ').title()}",
-            showlegend=False
-        ))
-        
-        # Get the current trait name for this spectrum
-        current_intensity_levels = list(TRAIT_MAPPINGS[getattr(TraitSpectrum, spectrum_name.upper())].keys())
-        closest_intensity = min(current_intensity_levels, key=lambda x: abs(x - current_value))
-        current_trait = TRAIT_MAPPINGS[getattr(TraitSpectrum, spectrum_name.upper())][closest_intensity]
-        
-        # Add trait words for each position
-        for i, intensity in enumerate(intensities):
-            trait_name = TRAIT_MAPPINGS[getattr(TraitSpectrum, spectrum_name.upper())][intensity]
-            
-            # Determine text style
-            text_color = 'black'
-            text_size = 12
-            
-            fig.add_annotation(
-                x=intensity,
-                y=current_y + 0.2,  # Position above the line
-                text=trait_name,
-                showarrow=False,
-                font=dict(color=text_color, size=text_size, family="Arial"),
-                xanchor='center',
-                yanchor='bottom'
-            )
-        
-        # Add spectrum name
-        formatted_name = spectrum_name.replace("_", " ").title()
-        fig.add_annotation(
-            x=-1.2,
-            y=current_y,
-            text=formatted_name,
-            showarrow=False,
-            font=dict(color='black', size=14, family="Arial"),
-            xanchor='right',
-            yanchor='middle'
-        )
-    
-    # Update layout
-    fig.update_layout(
-        title={
-            'text': "Big Five Personality Profile",
-            'font': {'size': 22}
-        },
-        xaxis=dict(
-            title="Trait Intensity",
-            tickvals=intensities,
-            ticktext=intensity_labels,
-            range=[-1.3, 1.1],
-        ),
-        yaxis=dict(
-            showticklabels=False,
-            range=[-0.5, 5.5]
-        ),
-        height=600,
-        margin=dict(l=120, r=20, t=60, b=50),
-        plot_bgcolor='white',
-        showlegend=False
-    )
-    
-    # Add gray gridlines at each intensity value
-    for intensity in intensities:
-        fig.add_shape(
-            type="line",
-            x0=intensity,
-            x1=intensity,
-            y0=-0.5,
-            y1=5.5,
-            line=dict(color="rgba(200,200,200,0.5)", width=1, dash="dot")
-        )
-    
-    return fig
+# Removed Plotly chart creation function as it's no longer needed
 
 
 def create_process_message_handler(bot):
@@ -497,23 +185,14 @@ def create_process_message_handler(bot):
         """Process a user message and update the UI."""
         # Check empty input
         if not user_message.strip():
-            return "", history, None, ""
+            return "", history, ""
         
         # Convert history to a list if it's not already (for safety)
         history_list = list(history) if history else []
         
-        # Get response and trait state - pass the chat history
-        response, trait_info = bot.respond(user_message, history_list)
-        
-        # Generate chart from trait values
-        trait_chart = create_trait_chart(trait_info.get("trait_values", {}))
-        
-        # Format dominant traits text
-        dominant_traits_text = "Dominant traits: "
-        if "dominant_traits" in trait_info and trait_info["dominant_traits"]:
-            dominant_traits_text += ", ".join(trait_info["dominant_traits"])
-        else:
-            dominant_traits_text += "None"
+        # Get response - pass the chat history
+        # Note: We no longer need trait_info since we're using sliders
+        response, _ = bot.respond(user_message, history_list)
         
         # Format the response - just get the text part if it's a tuple
         response_text = format_message_for_display(response)
@@ -525,7 +204,7 @@ def create_process_message_handler(bot):
         updated_history.append({"role": "assistant", "content": response_text})
         
         # Return the necessary information
-        return "", updated_history, trait_chart, dominant_traits_text
+        return "", updated_history, ""
     
     return process_message
 
@@ -534,22 +213,11 @@ def create_reset_chat_handler(bot):
     """Create a reset function with a reference to the bot."""
     def reset_chat(history):
         """Reset the chat history and return a clean state."""
-        import plotly.graph_objects as go
-        
         bot.reset_conversation()
-        
-        # Create empty figure for the reset state
-        fig = go.Figure()
-        fig.add_annotation(
-            text="No personality trait data available",
-            showarrow=False,
-            font=dict(size=14)
-        )
-        fig.update_layout(title="Big Five Personality Profile")
         
         # Return empty list for the chat history
         empty_history = []
-        return empty_history, fig, "Dominant traits: None"
+        return empty_history, ""
     
     return reset_chat
 
@@ -558,11 +226,41 @@ def create_ui(bot):
     """Create the Gradio UI for the chatbot."""
     with gr.Blocks(title="Temperament AI Chatbot") as app:
         gr.Markdown("# Temperament AI Chatbot")
-        gr.Markdown("This chatbot uses the Big Five personality model to simulate a unique temperament in an AI assistant.")
+        gr.Markdown("This chatbot uses the Big Five personality model with adjustable temperament traits.")
         
         # Create handlers with access to the bot
         process_message_fn = create_process_message_handler(bot)
         reset_chat_fn = create_reset_chat_handler(bot)
+        
+        # Function to update a single trait
+        def update_trait(trait_name, value):
+            # Update the specific trait
+            from source.bigfivemodel import TraitState, TraitSpectrum
+            spectrum = getattr(TraitSpectrum, trait_name.upper())
+            trait_state = TraitState(spectrum=spectrum, intensity=value)
+            
+            # Set the trait in the agent's profile
+            setattr(bot.agent.profile, trait_name, trait_state)
+            
+            # Update the system prompt
+            bot.agent.current_prompt = bot.agent._generate_prompt()
+            
+            # Return the trait name
+            return get_trait_name_for_value(trait_name, value)
+        
+        # Function to get trait name for slider value
+        def get_trait_name_for_value(trait_name, value):
+            from source.bigfivemodel import TRAIT_MAPPINGS, TraitSpectrum
+            
+            # Get the trait spectrum
+            spectrum = getattr(TraitSpectrum, trait_name.upper())
+            
+            # Find the closest intensity level
+            intensity_levels = list(TRAIT_MAPPINGS[spectrum].keys())
+            closest_intensity = min(intensity_levels, key=lambda x: abs(x - value))
+            
+            # Return the trait name
+            return TRAIT_MAPPINGS[spectrum][closest_intensity]
         
         with gr.Row():
             with gr.Column(scale=2):
@@ -587,29 +285,127 @@ def create_ui(bot):
                     clear_btn = gr.Button("Reset Chat", variant="secondary")
             
             with gr.Column(scale=1):
-                # Trait visualization
-                gr.Markdown("## Bot's Personality Profile")
-                # Use gr.Plot which works with Plotly figures
-                trait_chart = gr.Plot(label="Big Five Personality Profile")
-                dominant_traits = gr.Markdown("Dominant traits: None")
+                # Temperament controls
+                gr.Markdown("## Adjust Bot's Personality")
+                
+                # Get initial values from bot's profile
+                initial_extraversion = bot.agent.profile.extraversion.intensity
+                initial_agreeableness = bot.agent.profile.agreeableness.intensity
+                initial_conscientiousness = bot.agent.profile.conscientiousness.intensity
+                initial_emotional_stability = bot.agent.profile.emotional_stability.intensity
+                initial_openness = bot.agent.profile.openness.intensity
+                
+                with gr.Row():
+                    extraversion_slider = gr.Slider(
+                        minimum=-1.0, maximum=1.0, step=0.1, 
+                        value=initial_extraversion,
+                        label="Extraversion"
+                    )
+                    extraversion_trait = gr.Textbox(
+                        value=get_trait_name_for_value("extraversion", initial_extraversion),
+                        label="Trait",
+                        interactive=False
+                    )
+                
+                with gr.Row():
+                    agreeableness_slider = gr.Slider(
+                        minimum=-1.0, maximum=1.0, step=0.1, 
+                        value=initial_agreeableness,
+                        label="Agreeableness"
+                    )
+                    agreeableness_trait = gr.Textbox(
+                        value=get_trait_name_for_value("agreeableness", initial_agreeableness),
+                        label="Trait",
+                        interactive=False
+                    )
+                
+                with gr.Row():
+                    conscientiousness_slider = gr.Slider(
+                        minimum=-1.0, maximum=1.0, step=0.1, 
+                        value=initial_conscientiousness,
+                        label="Conscientiousness"
+                    )
+                    conscientiousness_trait = gr.Textbox(
+                        value=get_trait_name_for_value("conscientiousness", initial_conscientiousness),
+                        label="Trait",
+                        interactive=False
+                    )
+                
+                with gr.Row():
+                    emotional_stability_slider = gr.Slider(
+                        minimum=-1.0, maximum=1.0, step=0.1, 
+                        value=initial_emotional_stability,
+                        label="Emotional Stability"
+                    )
+                    emotional_stability_trait = gr.Textbox(
+                        value=get_trait_name_for_value("emotional_stability", initial_emotional_stability),
+                        label="Trait",
+                        interactive=False
+                    )
+                
+                with gr.Row():
+                    openness_slider = gr.Slider(
+                        minimum=-1.0, maximum=1.0, step=0.1, 
+                        value=initial_openness,
+                        label="Openness"
+                    )
+                    openness_trait = gr.Textbox(
+                        value=get_trait_name_for_value("openness", initial_openness),
+                        label="Trait",
+                        interactive=False
+                    )
+                
+                # Status message
+                status_msg = gr.Markdown("Adjust the sliders to change the bot's personality traits")
         
-        # Event handlers
+        # Event handlers for chat
         submit_btn.click(
             fn=process_message_fn,
             inputs=[msg, chatbot],
-            outputs=[msg, chatbot, trait_chart, dominant_traits]
+            outputs=[msg, chatbot, status_msg]
         )
         
         msg.submit(
             fn=process_message_fn,
             inputs=[msg, chatbot],
-            outputs=[msg, chatbot, trait_chart, dominant_traits]
+            outputs=[msg, chatbot, status_msg]
         )
         
         clear_btn.click(
             fn=reset_chat_fn,
             inputs=[chatbot],
-            outputs=[chatbot, trait_chart, dominant_traits]
+            outputs=[chatbot, status_msg]
+        )
+        
+        # Individual slider change events to update trait text and bot's personality instantly
+        extraversion_slider.change(
+            fn=lambda x: update_trait("extraversion", x),
+            inputs=[extraversion_slider],
+            outputs=[extraversion_trait]
+        )
+        
+        agreeableness_slider.change(
+            fn=lambda x: update_trait("agreeableness", x),
+            inputs=[agreeableness_slider],
+            outputs=[agreeableness_trait]
+        )
+        
+        conscientiousness_slider.change(
+            fn=lambda x: update_trait("conscientiousness", x),
+            inputs=[conscientiousness_slider],
+            outputs=[conscientiousness_trait]
+        )
+        
+        emotional_stability_slider.change(
+            fn=lambda x: update_trait("emotional_stability", x),
+            inputs=[emotional_stability_slider],
+            outputs=[emotional_stability_trait]
+        )
+        
+        openness_slider.change(
+            fn=lambda x: update_trait("openness", x),
+            inputs=[openness_slider],
+            outputs=[openness_trait]
         )
     
     return app
@@ -618,7 +414,7 @@ def create_ui(bot):
 def main():
     """Run the Gradio application."""
     # Parse command line arguments
-    parser = argparse.ArgumentParser(description="Temperament chatbot with Gradio UI")
+    parser = argparse.ArgumentParser(description="Temperament chatbot with adjustable Big Five traits")
     parser.add_argument("--model", type=str, default="gpt-4.1-mini-2025-04-14", help="OpenAI model to use")
     parser.add_argument("--temp", type=float, default=0.7, help="Temperature for generation")
     parser.add_argument("--share", action="store_true", help="Create a shareable link")
@@ -649,7 +445,8 @@ def main():
     
     # Create and launch the UI
     app = create_ui(bot)
-    app.launch(server_name=args.server_name, share=args.share)
+    app.launch(server_name=args.server_name, share=args.share, 
+               height=900)  # Increased height to accommodate sliders
 
 
 if __name__ == "__main__":

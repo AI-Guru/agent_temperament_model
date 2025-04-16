@@ -26,7 +26,6 @@ class TemperamentAgent:
     def __init__(
         self, 
         initial_profile: Optional[TemperamentProfile] = None,
-        trait_adaptation_rate: float = 0.1,
         base_system_prompt: str = "You are a helpful assistant."
     ):
         """
@@ -34,12 +33,10 @@ class TemperamentAgent:
         
         Args:
             initial_profile: Initial personality profile (defaults to balanced)
-            trait_adaptation_rate: Rate at which the agent adapts to detected user traits
             base_system_prompt: Base system prompt to append personality guidelines to
         """
         self.profile = initial_profile if initial_profile else TemperamentProfile()
         self.baseline_profile = self.profile.model_copy(deep=True)
-        self.trait_adaptation_rate = max(0.0, min(1.0, trait_adaptation_rate))
         self.base_system_prompt = base_system_prompt
         self.last_update_time = time.time()
         self.interaction_history = []
@@ -54,43 +51,18 @@ class TemperamentAgent:
         personality_guidelines = generate_temperament_prompt(self.profile)
         return f"{self.base_system_prompt}\n\n{personality_guidelines}"
     
-    def update_temperament(self, 
-                          trait_adjustments: Optional[Dict[str, float]] = None, 
-                          user_message: Optional[str] = None,
-                          trait_analyzer: Optional[Callable[[str], Dict[str, float]]] = None) -> None:
+    def update_temperament(self, trait_adjustments: Optional[Dict[str, float]] = None) -> None:
         """
-        Update the agent's personality traits based on direct adjustments or user message analysis.
+        Update the agent's personality traits based on direct adjustments.
         
         Args:
             trait_adjustments: Direct adjustments to trait spectra (e.g., {"extraversion": 0.2})
-            user_message: User message to analyze for personality content
-            trait_analyzer: Function to analyze personality traits in user messages
         """
         # Apply direct trait adjustments
         if trait_adjustments:
             for spectrum_name, adjustment in trait_adjustments.items():
                 self.profile.adjust_trait(spectrum_name, adjustment)
                 logger.debug(f"Adjusted {spectrum_name} by {adjustment}")
-        
-        # Analyze user message for trait content if provided
-        if user_message and trait_analyzer:
-            try:
-                detected_traits = trait_analyzer(user_message)
-                
-                # Create a temporary profile from detected traits
-                detected_profile = TemperamentProfile()
-                for spectrum_name, intensity in detected_traits.items():
-                    detected_profile.adjust_trait(spectrum_name, intensity)
-                
-                # Adapt the agent's profile toward detected traits
-                self.profile = self.profile.blend_with(
-                    detected_profile, 
-                    weight=self.trait_adaptation_rate
-                )
-                logger.debug(f"Adapted to user traits with weight {self.trait_adaptation_rate}")
-                
-            except Exception as e:
-                logger.error(f"Error analyzing user message: {e}")
         
         # Update the prompt based on the new temperament state
         self.current_prompt = self._generate_prompt()
@@ -145,7 +117,6 @@ class TemperamentAgent:
         state = {
             "current_profile": self.profile.model_dump(),
             "baseline_profile": self.baseline_profile.model_dump(),
-            "trait_adaptation_rate": self.trait_adaptation_rate,
             "base_system_prompt": self.base_system_prompt,
             "last_update_time": self.last_update_time,
         }
@@ -179,7 +150,6 @@ class TemperamentAgent:
             # Create the agent
             agent = cls(
                 initial_profile=current_profile,
-                trait_adaptation_rate=state["trait_adaptation_rate"],
                 base_system_prompt=state["base_system_prompt"]
             )
             
@@ -197,45 +167,6 @@ class TemperamentAgent:
 
 # Example usage
 if __name__ == "__main__":
-    # Create a sample trait analyzer function
-    def simple_trait_analyzer(text: str) -> Dict[str, float]:
-        """A very simple trait analyzer that looks for key words."""
-        traits = {
-            "extraversion": 0.0,
-            "agreeableness": 0.0,
-            "conscientiousness": 0.0,
-            "emotional_stability": 0.0,
-            "openness": 0.0
-        }
-        
-        # Simple keyword matching (just for demonstration)
-        if any(word in text.lower() for word in ["social", "party", "people", "outgoing"]):
-            traits["extraversion"] = 0.5
-        if any(word in text.lower() for word in ["quiet", "alone", "private", "solitude"]):
-            traits["extraversion"] = -0.5
-            
-        if any(word in text.lower() for word in ["kind", "helpful", "cooperative", "agree"]):
-            traits["agreeableness"] = 0.5
-        if any(word in text.lower() for word in ["challenge", "disagree", "critical", "question"]):
-            traits["agreeableness"] = -0.5
-            
-        if any(word in text.lower() for word in ["organized", "plan", "precise", "thorough"]):
-            traits["conscientiousness"] = 0.5
-        if any(word in text.lower() for word in ["spontaneous", "flexible", "relaxed", "easygoing"]):
-            traits["conscientiousness"] = -0.5
-            
-        if any(word in text.lower() for word in ["calm", "relaxed", "steady", "stable"]):
-            traits["emotional_stability"] = 0.5
-        if any(word in text.lower() for word in ["emotional", "sensitive", "anxious", "worry"]):
-            traits["emotional_stability"] = -0.5
-            
-        if any(word in text.lower() for word in ["creative", "new", "imagine", "explore"]):
-            traits["openness"] = 0.5
-        if any(word in text.lower() for word in ["traditional", "practical", "routine", "conventional"]):
-            traits["openness"] = -0.5
-            
-        return traits
-    
     # Create an initial profile - a friendly, sociable assistant
     initial_profile = TemperamentProfile.create_from_trait_names(
         extraversion="Sociable",
@@ -245,7 +176,6 @@ if __name__ == "__main__":
     # Create the agent
     agent = TemperamentAgent(
         initial_profile=initial_profile,
-        trait_adaptation_rate=0.3,
         base_system_prompt="You are a helpful AI assistant designed to provide information and assistance."
     )
     
@@ -253,15 +183,12 @@ if __name__ == "__main__":
     print("=== Initial System Prompt ===")
     print(agent.get_system_prompt())
     
-    # Simulate an interaction
-    user_message = "I prefer organized plans and structure, but I'm also quite anxious about my presentation tomorrow."
-    print(f"\n=== User Message ===\n{user_message}")
-    
-    # Update personality state based on user message
-    agent.update_temperament(
-        user_message=user_message,
-        trait_analyzer=simple_trait_analyzer
-    )
+    # Simulate a trait adjustment
+    print("\n=== Adjusting Traits ===")
+    agent.update_temperament(trait_adjustments={
+        "conscientiousness": 0.6,
+        "openness": 0.3
+    })
     
     # Print the updated prompt
     print("\n=== Updated System Prompt ===")

@@ -71,7 +71,6 @@ class TemperamentChatBot:
         # Create the temperament agent
         self.agent = TemperamentAgent(
             initial_profile=initial_profile,
-            trait_adaptation_rate=0.2,
             base_system_prompt=(
                 "You are a helpful AI assistant with a unique personality. "
                 "Your goal is to provide accurate and useful information while connecting with the user."
@@ -162,7 +161,7 @@ class TemperamentChatBot:
             # Analyze traits in the user message
             user_traits = self.analyze_traits(user_message)
             
-            # Update agent's trait state
+            # Update agent's trait state with analyzed traits
             self.agent.update_temperament(trait_adjustments=user_traits)
             
             # Get the current system prompt
