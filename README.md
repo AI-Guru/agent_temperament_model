@@ -1,6 +1,6 @@
 # Temperament Modeling for LLM Agents
 
-![Temperament Bot](emotionalbot.png)
+![Temperament Bot](temperamentbot.png)
 
 This repository implements a Linguistic Personality Adaptation Framework for LLM Agents. It provides a complete framework for modeling, managing, and integrating personality traits into LLM-powered agents based on the Big Five personality model.
 
